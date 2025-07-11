@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </li>
                             `).join('')}
                         </ul>
-                    ` : `<p class="text-gray-400">Kono upcoming deadline nei.</p>`}
+                    ` : `<p class="text-gray-400">No upcoming deadlines.</p>`}
                 </div>
                 <div class="bg-gray-800 p-6 rounded-lg">
                     <h2 class="text-xl font-semibold mb-4">Quick Actions</h2>
@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <ul class="space-y-2">
                             ${pendingProjects.map(p => `<li>${p.title}</li>`).join('')}
                         </ul>
-                    ` : `<p class="text-gray-400">Kono project pending nei. Shob kaj shesh!</p>`}
+                    ` : `<p class="text-gray-400">No pending projects. Great job!</p>`}
                 </div>
                 <div class="bg-gray-800 p-6 rounded-lg">
                     <h2 class="text-xl font-semibold mb-4">Pending Assignments</h2>
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <ul class="space-y-2">
                             ${pendingAssignments.map(a => `<li>${a.title}</li>`).join('')}
                         </ul>
-                    ` : `<p class="text-gray-400">Kono assignment pending nei. Shob clear!</p>`}
+                    ` : `<p class="text-gray-400">No pending assignments. All clear!</p>`}
                 </div>
             </div>
         `;
@@ -152,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </li>
                             `).join('')}
                         </ul>
-                    ` : `<p class="text-gray-400 text-center py-8">Ekhane kono ${viewType} nei. Shuru korar jonno ekta add korun!</p>`}
+                    ` : `<p class="text-gray-400 text-center py-8">No ${viewType} yet. Add one to get started!</p>`}
                 </div>
             </div>
         `;
@@ -329,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleDeleteItem(type, itemToDelete) {
-        if (window.confirm('Apni ki nishchit vabe ei item-ti delete korte chan?')) {
+        if (window.confirm('Are you sure you want to delete this item?')) {
             state.items[type] = state.items[type].filter(item => item.id !== itemToDelete.id);
             saveStateToLocalStorage();
             render();
