@@ -1,435 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Planner</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Custom CSS File -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-900 text-white font-sans">
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Book, Briefcase, Clock, Bell, Trash2, Edit, CheckCircle, XCircle, Download } from 'lucide-react';
-
-// --- Main App Component ---
-export default function App() {
-    const [loading, setLoading] = useState(true);
-    const [activeView, setActiveView] = useState('dashboard');
-    const [items, setItems] = useState({
-        projects: [],
-        assignments: [],
-        classes: [],
-        books: [],
-        cts: [],
-    });
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalType, setModalType] = useState('');
-    const [editingItem, setEditingItem] = useState(null);
-
-    // Effect for loading data from localStorage on initial render
-    useEffect(() => {
-        try {
-            const savedItems = localStorage.getItem('academicPlannerItems');
-            if (savedItems) {
-                setItems(JSON.parse(savedItems));
-            }
-        } catch (error) {
-            console.error("Could not load items from localStorage", error);
-        }
-        setLoading(false);
-    }, []);
-
-    // Effect for saving data to localStorage whenever items change
-    useEffect(() => {
-        try {
-            localStorage.setItem('academicPlannerItems', JSON.stringify(items));
-        } catch (error) {
-            console.error("Could not save items to localStorage", error);
-        }
-    }, [items]);
-
-
-    const openModal = (type, item = null) => {
-        setModalType(type);
-        setEditingItem(item);
-        setIsModalOpen(true);
-    };
-
-    const closeModal = () => {
-        setIsModalOpen(false);
-        setEditingItem(null);
-    };
-    
-    // Helper function to convert a file to a Base64 data URL
-    const fileToDataUrl = (file) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    };
-
-    const handleAddItem = async (item, file) => {
-        const { type, ...data } = item;
-        const newItem = {
-            ...data,
-            id: Date.now().toString(), // Simple unique ID
-            createdAt: new Date().toISOString(),
-        };
-
-        if (file) {
-            if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                alert("File is too large. Please upload files smaller than 5MB.");
-                return;
-            }
-            try {
-                const fileURL = await fileToDataUrl(file);
-                newItem.fileURL = fileURL;
-                newItem.fileName = file.name;
-            } catch (error) {
-                console.error("Error converting file to data URL", error);
-            }
-        }
-
-        setItems(prevItems => ({
-            ...prevItems,
-            [type]: [...prevItems[type], newItem]
-        }));
-        closeModal();
-    };
-
-    const handleUpdateItem = async (item, file) => {
-        const { type, id, ...data } = item;
-        
-        const updatedItem = { ...data, id };
-
-        if (file) {
-             if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                alert("File is too large. Please upload files smaller than 5MB.");
-                return;
-            }
-            try {
-                const fileURL = await fileToDataUrl(file);
-                updatedItem.fileURL = fileURL;
-                updatedItem.fileName = file.name;
-            } catch (error) {
-                console.error("Error converting file to data URL", error);
-            }
-        } else if (editingItem.fileURL) {
-            // Keep the old file if a new one isn't provided
-            updatedItem.fileURL = editingItem.fileURL;
-            updatedItem.fileName = editingItem.fileName;
-        }
-
-        setItems(prevItems => ({
-            ...prevItems,
-            [type]: prevItems[type].map(i => i.id === id ? updatedItem : i)
-        }));
-        closeModal();
-    };
-
-    const handleDeleteItem = (type, itemToDelete) => {
-        if (window.confirm('Apni ki nishchit vabe ei item-ti delete korte chan?')) {
-            setItems(prevItems => ({
-                ...prevItems,
-                [type]: prevItems[type].filter(item => item.id !== itemToDelete.id)
-            }));
-        }
-    };
-    
-    const toggleItemStatus = (type, id, currentStatus) => {
-        setItems(prevItems => ({
-            ...prevItems,
-            [type]: prevItems[type].map(item => 
-                item.id === id ? { ...item, status: currentStatus === 'done' ? 'pending' : 'done' } : item
-            )
-        }));
-    };
-
-    if (loading) {
-        return <div className="flex items-center justify-center h-screen bg-gray-900 text-white">Loading...</div>;
-    }
-
-    return (
-        <div className="flex h-screen bg-gray-900 text-white font-sans">
-            <Sidebar setActiveView={setActiveView} activeView={activeView} />
-            <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-                {activeView === 'dashboard' && <Dashboard items={items} openModal={openModal} />}
-                {activeView !== 'dashboard' && (
-                    <ItemView
-                        viewType={activeView}
-                        items={items[activeView] || []}
-                        openModal={openModal}
-                        handleDeleteItem={handleDeleteItem}
-                        toggleItemStatus={toggleItemStatus}
-                    />
-                )}
-            </main>
-            {isModalOpen && (
-                <ItemModal
-                    closeModal={closeModal}
-                    modalType={modalType}
-                    handleAddItem={handleAddItem}
-                    handleUpdateItem={handleUpdateItem}
-                    editingItem={editingItem}
-                />
-            )}
-        </div>
-    );
-}
-
-// --- Components ---
-
-const Sidebar = ({ setActiveView, activeView }) => {
-    const navItems = [
-        { id: 'dashboard', label: 'Dashboard', icon: Bell },
-        { id: 'projects', label: 'Projects', icon: Briefcase },
-        { id: 'assignments', label: 'Assignments', icon: Edit },
-        { id: 'classes', label: 'Classes', icon: Clock },
-        { id: 'books', label: 'Books & Lectures', icon: Book },
-        { id: 'cts', label: 'CTs & Programs', icon: Briefcase },
-    ];
-
-    return (
-        <nav className="w-16 md:w-64 bg-gray-800 p-2 md:p-4 flex flex-col">
-            <div className="text-2xl font-bold mb-10 hidden md:block">Academia</div>
-            <ul className="space-y-2">
-                {navItems.map(item => (
-                    <li key={item.id}>
-                        <button
-                            onClick={() => setActiveView(item.id)}
-                            className={`w-full flex items-center p-3 rounded-lg transition-colors ${
-                                activeView === item.id ? 'bg-blue-600' : 'hover:bg-gray-700'
-                            }`}
-                        >
-                            <item.icon className="h-6 w-6 md:mr-4" />
-                            <span className="hidden md:inline">{item.label}</span>
-                        </button>
-                    </li>
-                ))}
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <nav class="w-16 md:w-64 bg-gray-800 p-2 md:p-4 flex flex-col">
+            <div class="text-2xl font-bold mb-10 hidden md:block">Academia</div>
+            <ul class="space-y-2" id="sidebar-nav">
+                <li>
+                    <button data-view="dashboard" class="nav-button w-full flex items-center p-3 rounded-lg bg-blue-600">
+                        <i class="fa-solid fa-bell h-6 w-6 md:mr-4"></i> <span class="hidden md:inline">Dashboard</span>
+                    </button>
+                </li>
+                <li>
+                    <button data-view="projects" class="nav-button w-full flex items-center p-3 rounded-lg hover:bg-gray-700">
+                        <i class="fa-solid fa-briefcase h-6 w-6 md:mr-4"></i> <span class="hidden md:inline">Projects</span>
+                    </button>
+                </li>
+                <li>
+                    <button data-view="assignments" class="nav-button w-full flex items-center p-3 rounded-lg hover:bg-gray-700">
+                        <i class="fa-solid fa-edit h-6 w-6 md:mr-4"></i> <span class="hidden md:inline">Assignments</span>
+                    </button>
+                </li>
+                <li>
+                    <button data-view="classes" class="nav-button w-full flex items-center p-3 rounded-lg hover:bg-gray-700">
+                        <i class="fa-solid fa-clock h-6 w-6 md:mr-4"></i> <span class="hidden md:inline">Classes</span>
+                    </button>
+                </li>
+                <li>
+                    <button data-view="books" class="nav-button w-full flex items-center p-3 rounded-lg hover:bg-gray-700">
+                        <i class="fa-solid fa-book h-6 w-6 md:mr-4"></i> <span class="hidden md:inline">Books & Lectures</span>
+                    </button>
+                </li>
+                <li>
+                    <button data-view="cts" class="nav-button w-full flex items-center p-3 rounded-lg hover:bg-gray-700">
+                        <i class="fa-solid fa-clipboard-list h-6 w-6 md:mr-4"></i> <span class="hidden md:inline">CTs & Programs</span>
+                    </button>
+                </li>
             </ul>
         </nav>
-    );
-};
 
-const Dashboard = ({ items, openModal }) => {
-    const upcomingItems = Object.values(items).flat()
-        .filter(item => item.deadline && new Date(item.deadline) > new Date())
-        .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
-        .slice(0, 5);
+        <!-- Main Content -->
+        <main class="flex-1 p-4 md:p-8 overflow-y-auto" id="main-content">
+            <!-- Content will be rendered here by JavaScript -->
+        </main>
+    </div>
 
-    const pendingAssignments = items.assignments.filter(a => a.status !== 'done');
-    const pendingProjects = items.projects.filter(p => p.status !== 'done');
-
-    return (
-        <div>
-            <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-gray-800 p-6 rounded-lg col-span-1 md:col-span-2">
-                    <h2 className="text-xl font-semibold mb-4">Upcoming Deadlines</h2>
-                    {upcomingItems.length > 0 ? (
-                        <ul className="space-y-3">
-                            {upcomingItems.map(item => (
-                                <li key={item.id} className="flex justify-between items-center bg-gray-700 p-3 rounded-md">
-                                    <span>{item.title}</span>
-                                    <span className="text-sm text-yellow-400">{new Date(item.deadline).toLocaleDateString()}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="text-gray-400">Kono upcoming deadline nei.</p>
-                    )}
+    <!-- Modal -->
+    <div id="item-modal" class="fixed inset-0 modal-bg flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 rounded-lg p-8 w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-6" id="modal-title"></h2>
+            <form id="modal-form">
+                <div id="modal-fields">
+                    <!-- Form fields will be rendered here by JavaScript -->
                 </div>
-                <div className="bg-gray-800 p-6 rounded-lg">
-                    <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-                    <div className="space-y-3">
-                        <button onClick={() => openModal('projects')} className="w-full text-left bg-blue-500 hover:bg-blue-600 p-3 rounded-md flex items-center"><Plus className="mr-2"/> Add Project</button>
-                        <button onClick={() => openModal('assignments')} className="w-full text-left bg-green-500 hover:bg-green-600 p-3 rounded-md flex items-center"><Plus className="mr-2"/> Add Assignment</button>
-                        <button onClick={() => openModal('classes')} className="w-full text-left bg-purple-500 hover:bg-purple-600 p-3 rounded-md flex items-center"><Plus className="mr-2"/> Add Class</button>
-                    </div>
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button type="button" id="modal-cancel-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+                    <button type="submit" id="modal-submit-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg"></button>
                 </div>
-                <div className="bg-gray-800 p-6 rounded-lg">
-                    <h2 className="text-xl font-semibold mb-4">Pending Projects</h2>
-                     {pendingProjects.length > 0 ? (
-                        <ul className="space-y-2">
-                            {pendingProjects.map(p => <li key={p.id}>{p.title}</li>)}
-                        </ul>
-                    ) : <p className="text-gray-400">Kono project pending nei. Shob kaj shesh!</p>}
-                </div>
-                 <div className="bg-gray-800 p-6 rounded-lg">
-                    <h2 className="text-xl font-semibold mb-4">Pending Assignments</h2>
-                     {pendingAssignments.length > 0 ? (
-                        <ul className="space-y-2">
-                            {pendingAssignments.map(a => <li key={a.id}>{a.title}</li>)}
-                        </ul>
-                    ) : <p className="text-gray-400">Kono assignment pending nei. Shob clear!</p>}
-                </div>
-            </div>
+            </form>
         </div>
-    );
-};
+    </div>
 
-const ItemView = ({ viewType, items, openModal, handleDeleteItem, toggleItemStatus }) => {
-    const title = viewType === 'books' ? 'Books & Lectures' : viewType.charAt(0).toUpperCase() + viewType.slice(1);
-    
-    return (
-        <div>
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">{title}</h1>
-                <button onClick={() => openModal(viewType)} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center">
-                    <Plus className="mr-2"/> Add {viewType === 'books' ? 'Item' : title.slice(0, -1)}
-                </button>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-4">
-                {items.length > 0 ? (
-                    <ul className="space-y-4">
-                        {items.map(item => (
-                            <li key={item.id} className="bg-gray-700 p-4 rounded-md flex flex-col md:flex-row justify-between items-start md:items-center">
-                                <div className="flex-1 mb-3 md:mb-0">
-                                    <p className="font-bold text-lg">{item.title}</p>
-                                    {item.course && <p className="text-sm text-gray-400">Course: {item.course}</p>}
-                                    {item.deadline && <p className="text-sm text-yellow-400">Deadline: {new Date(item.deadline).toLocaleDateString()}</p>}
-                                    {item.day && <p className="text-sm text-cyan-400">{item.day} at {item.time}</p>}
-                                    {item.semester && <p className="text-sm text-gray-400">Semester: {item.semester}</p>}
-                                    {item.fileURL && <p className="text-sm text-blue-400 truncate">File: {item.fileName}</p>}
-                                    {item.status && (
-                                        <p className={`text-sm ${item.status === 'done' ? 'text-green-400' : 'text-orange-400'}`}>
-                                            Status: {item.status}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                     {item.fileURL && (
-                                        <a href={item.fileURL} download={item.fileName} className="p-2 bg-blue-500 hover:bg-blue-600 rounded-full inline-block"><Download size={20} /></a>
-                                     )}
-                                     {(viewType === 'projects' || viewType === 'assignments') && (
-                                        <button onClick={() => toggleItemStatus(viewType, item.id, item.status)} className={`p-2 rounded-full ${item.status === 'done' ? 'bg-green-500 hover:bg-green-600' : 'bg-orange-500 hover:bg-orange-600'}`}>
-                                            {item.status === 'done' ? <XCircle size={20} /> : <CheckCircle size={20} />}
-                                        </button>
-                                    )}
-                                    <button onClick={() => openModal(viewType, item)} className="p-2 bg-yellow-500 hover:bg-yellow-600 rounded-full"><Edit size={20} /></button>
-                                    <button onClick={() => handleDeleteItem(viewType, item)} className="p-2 bg-red-500 hover:bg-red-600 rounded-full"><Trash2 size={20} /></button>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-gray-400 text-center py-8">Ekhane kono {viewType} nei. Shuru korar jonno ekta add korun!</p>
-                )}
-            </div>
-        </div>
-    );
-};
+    <!-- Custom JavaScript File -->
+    <script src="script.js"></script>
+</body>
+</html>
 
-const ItemModal = ({ closeModal, modalType, handleAddItem, handleUpdateItem, editingItem }) => {
-    const [formData, setFormData] = useState(
-        editingItem || {
-            title: '',
-            course: '',
-            deadline: '',
-            status: 'pending',
-            day: 'Monday',
-            time: '',
-            semester: '',
-        }
-    );
-    const [file, setFile] = useState(null);
-    const fileInputRef = useRef();
-
-    useEffect(() => {
-        // When editing, reset form data if the editingItem changes
-        setFormData(editingItem || {
-            title: '', course: '', deadline: '', status: 'pending', day: 'Monday', time: '', semester: '',
-        });
-    }, [editingItem]);
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleFileChange = (e) => {
-        setFile(e.target.files[0]);
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        const itemData = { ...formData, type: modalType };
-        if (editingItem) {
-            handleUpdateItem(itemData, file);
-        } else {
-            handleAddItem(itemData, file);
-        }
-    };
-    
-    const title = modalType === 'books' ? 'Book or Lecture' : modalType.slice(0, -1);
-
-    const commonFields = (
-        <div className="mb-4">
-            <label htmlFor="title" className="block text-sm font-medium text-gray-300 mb-1">Title</label>
-            <input type="text" name="title" id="title" value={formData.title} onChange={handleChange} className="w-full bg-gray-700 border border-gray-600 rounded-lg p-2" required />
-        </div>
-    );
-
-    const courseAndDeadlineFields = (
-        <>
-            <div className="mb-4">
-                <label htmlFor="course" className="block text-sm font-medium text-gray-300 mb-1">Course</label>
-                <input type="text" name="course" id="course" value={formData.course} onChange={handleChange} className="w-full bg-gray-700 border border-gray-600 rounded-lg p-2" />
-            </div>
-            <div className="mb-4">
-                <label htmlFor="deadline" className="block text-sm font-medium text-gray-300 mb-1">Deadline</label>
-                <input type="date" name="deadline" id="deadline" value={formData.deadline} onChange={handleChange} className="w-full bg-gray-700 border border-gray-600 rounded-lg p-2" />
-            </div>
-        </>
-    );
-
-    const renderFields = () => {
-        switch (modalType) {
-            case 'projects':
-            case 'assignments':
-            case 'cts':
-                return <> {commonFields} {courseAndDeadlineFields} </>;
-            case 'classes':
-                return (
-                    <>
-                        {commonFields}
-                        <div className="mb-4">
-                            <label htmlFor="day" className="block text-sm font-medium text-gray-300 mb-1">Day of Week</label>
-                            <select name="day" id="day" value={formData.day} onChange={handleChange} className="w-full bg-gray-700 border border-gray-600 rounded-lg p-2">
-                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => <option key={day} value={day}>{day}</option>)}
-                            </select>
-                        </div>
-                        <div className="mb-4">
-                            <label htmlFor="time" className="block text-sm font-medium text-gray-300 mb-1">Time</label>
-                            <input type="time" name="time" id="time" value={formData.time} onChange={handleChange} className="w-full bg-gray-700 border border-gray-600 rounded-lg p-2" />
-                        </div>
-                    </>
-                );
-            case 'books':
-                 return (
-                    <>
-                        {commonFields}
-                        <div className="mb-4">
-                            <label htmlFor="semester" className="block text-sm font-medium text-gray-300 mb-1">Semester</label>
-                            <input type="text" name="semester" id="semester" value={formData.semester} onChange={handleChange} className="w-full bg-gray-700 border border-gray-600 rounded-lg p-2" />
-                        </div>
-                        <div className="mb-4">
-                            <label htmlFor="file" className="block text-sm font-medium text-gray-300 mb-1">Upload File (PDF, DOCX, etc.)</label>
-                            <input type="file" name="file" id="file" ref={fileInputRef} onChange={handleFileChange} className="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-                            {editingItem?.fileName && !file && <p className="text-xs text-gray-400 mt-1">Current file: {editingItem.fileName}</p>}
-                        </div>
-                    </>
-                );
-            default:
-                return commonFields;
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-lg p-8 w-full max-w-md">
-                <h2 className="text-2xl font-bold mb-6">{editingItem ? 'Edit' : 'Add'} {title}</h2>
-                <form onSubmit={handleSubmit}>
-                    {renderFields()}
-                    <div className="flex justify-end space-x-4">
-                        <button type="button" onClick={closeModal} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
-                        <button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">{editingItem ? 'Update' : 'Add'}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-};
